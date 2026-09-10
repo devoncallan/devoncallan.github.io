@@ -1,0 +1,34 @@
+#!/bin/sh
+# Rebuild the index and push the site.
+#
+#   ./publish                 -> commits as "Update explorers"
+#   ./publish "new NMR run"   -> uses your message
+#
+# To add a page: copy the HTML file into tools/, then run this.
+
+set -e
+cd "$(dirname "$0")"
+
+if [ ! -d .git ]; then
+  echo "Not a git repository — run this from inside the site folder." >&2
+  exit 1
+fi
+
+echo "Building index..."
+python3 build.py
+
+if [ -z "$(git status --porcelain)" ]; then
+  echo "Nothing changed — site is already up to date."
+  exit 0
+fi
+
+echo
+echo "Changes to publish:"
+git status --short
+echo
+
+git add -A
+git commit -q -m "${1:-Update explorers}"
+git push -q origin HEAD
+
+echo "Pushed. Live in about a minute at https://devoncallan.github.io/"
