@@ -49,12 +49,18 @@ def normalize(path: Path) -> None:
         add.append(NOINDEX)
     if not add:
         return
+    metas = "\n".join(a for a in add if a != "<!doctype html>")
+    doctype = re.match(r"\s*<!doctype[^>]*>[^\S\n]*\n?", raw, re.I)
     if "<head>" in raw[:2000]:
-        # proper document: slot the robots tag inside the existing head
-        insert = "\n".join(a for a in add if a != "<!doctype html>")
-        out = raw.replace("<head>", "<head>\n" + insert, 1) if insert else raw
+        # proper document: slot the tags inside the existing head
+        out = raw.replace("<head>", "<head>\n" + metas, 1) if metas else raw
         if "<!doctype html>" in add:
             out = "<!doctype html>\n" + out
+    elif doctype:
+        # has a doctype but no explicit head: the doctype must stay the very
+        # first thing in the file or the browser falls back to quirks mode
+        cut = doctype.end()
+        out = raw[:cut] + (metas + "\n" if metas else "") + raw[cut:]
     else:
         # fragment: a leading doctype is enough, the parser builds head/body
         out = "\n".join(add) + "\n" + raw

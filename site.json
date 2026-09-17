@@ -12,6 +12,10 @@
     "tube-color-explorer.html": {
       "title": "Color Mixing Explorer",
       "description": "Data from prototype color mixing demo. 63 different mixtures of red, blue, and yellow dyes with UV-vis spectra and images."
+    },
+    "color_mixer_demo.html": {
+      "title": "Color mixer demo",
+      "description": "Interactive simulation of the color mixer. Pick a target color and it blends three dyes to match it."
     }
   }
 }
