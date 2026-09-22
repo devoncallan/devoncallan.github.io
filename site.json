@@ -1,5 +1,5 @@
 {
-  "_comment": "Pages appear on the index in the order they are listed here. Anything in tools/ that is not listed shows up after them, most recently changed first. Fields: title, description, hidden.",
+  "_comment": "The index lists every page in tools/, newest first, by each file's last commit date (or its modification time while uncommitted). This file only overrides what a page says about itself; listing order here means nothing. Fields: title, description, hidden.",
   "tools": {
     "nmr-1d-explorer.html": {
       "title": "Lipoate NMR Explorer",

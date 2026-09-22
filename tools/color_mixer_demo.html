@@ -54,6 +54,7 @@ header .grow{flex:1}
 
 .pick{flex:1}
 path.cell{cursor:pointer;transition:stroke-width .12s}
+path.cell.off{pointer-events:none}
 path.cell:hover{stroke:var(--ink);stroke-width:2}
 path.on{stroke:var(--ink);stroke-width:3.5}
 .go .make{flex:1 1 100%}
@@ -123,7 +124,6 @@ h2{font:700 1.25rem/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;c
 h2 .where{margin-left:auto;display:flex;align-items:center;gap:.35em;text-transform:none;letter-spacing:0;font:600 1.15rem/1 var(--sans);color:var(--ink2)}
 h2 .where svg{width:1.2em;height:1.2em;fill:var(--blue)}
 #wheel{flex:1;min-height:0;width:100%;height:100%;display:block}
-path.cell.off{pointer-events:none}
 
 .recipe{flex:1;justify-content:space-between;gap:.6rem}
 #bottles{width:100%;flex:1;min-height:0;display:block}
@@ -371,24 +371,63 @@ function grey(v) {
    that -- its strength slider reaches those colours anyway, so the rim is the
    only thing worth clicking. The target has no slider: there the wheel is the
    whole choice, so every ring stays live. */
+/* A disc, or an annulus when an inner radius is given: two subpaths read with
+   evenodd, so the middle is a hole rather than a fill. */
+function disc(r) {
+ return 'M' + (CX - r) + ' ' + CY + 'a' + r + ' ' + r + ' 0 1 0 ' + 2 * r + ' 0' +
+        'a' + r + ' ' + r + ' 0 1 0 ' + -2 * r + ' 0';
+}
+function band(rIn, rOut) { return disc(rOut) + (rIn > 0 ? disc(rIn) : '') }
+
 function draw(svg, cells, opts) {
- var greyInner = !opts || opts.grey !== false;
+ var o = opts || {};
+ /* Which rings are out of reach. One flag, because the glass IS the message:
+    something you could still click through it would be a lie. 'inner' is the
+    mixer, whose strength slider covers those anyway; 'rim' is the target. */
+ var locked = 'locked' in o ? o.locked : 'inner';
+ if (locked === true) locked = 'inner';
+ var frost = o.frost !== false;              /* false falls back to flat grey */
+ var blur = o.blur == null ? 5 : o.blur, wash = o.wash == null ? 0.5 : o.wash;
  var NR = 0, hues = {};
- cells.forEach(function (c) { NR = Math.max(NR, c.ring); hues[c.ring === 1 ? c.hue : c.hue] = 1 });
- var NH = Object.keys(hues).length, o = '';
+ cells.forEach(function (c) { NR = Math.max(NR, c.ring); hues[c.hue] = 1 });
+ var NH = Object.keys(hues).length, step = (R1 - R0) / NR;
+
+ function cell(c, i, off) {
+  var ra = R0 + (c.ring - 1) * step + GAP, rb = R0 + c.ring * step - GAP;
+  return '<path class="cell' + (off ? ' off' : '') + '" d="' + wedge(c.hue, 360 / NH - GAP, ra, rb) +
+         '" fill="' + (off && !frost ? grey(c.rgb) : rgb(c.rgb)) +
+         '" stroke="var(--rule)" stroke-width=".6" data-i="' + i + '"></path>';
+ }
+ var back = [], front = [];
  cells.forEach(function (c, i) {
-  var ra = R0 + (c.ring - 1) * (R1 - R0) / NR + GAP, rb = R0 + c.ring * (R1 - R0) / NR - GAP;
-  var rim = c.ring === NR, off = greyInner && !rim;
-  o += '<path class="cell' + (off ? ' off' : '') + '" d="' + wedge(c.hue, 360 / NH - GAP, ra, rb) +
-       '" fill="' + (off ? grey(c.rgb) : rgb(c.rgb)) +
-       '" stroke="var(--rule)" stroke-width=".6" data-i="' + i + '"></path>';
+  var rim = c.ring === NR;
+  var off = locked === 'rim' ? rim : (locked ? !rim : false);
+  (off && frost ? back : front).push(cell(c, i, off));
  });
- o += '<circle cx="' + CX + '" cy="' + CY + '" r="' + (R1 - 0.7) +
-      '" fill="none" stroke="var(--ink)" stroke-width="3.5"/>';
- o += '<circle cx="' + CX + '" cy="' + CY + '" r="' + (R0 - 4) +
-      '" fill="var(--surface)" stroke="var(--rule)"/>';
- o += '<circle id="hub" cx="' + CX + '" cy="' + CY + '" r="' + (R0 - 12) + '" fill="none"/>';
- svg.innerHTML = o;
+
+ var out = '';
+ if (frost && back.length) {
+  /* The glass stops at the cells themselves, so the ring gap either side of it
+     stays open -- a pane that ran into the gap read as a smudge, not a pane.
+     The blur is clipped to the same shape so it cannot bleed past it. */
+  var pane = locked === 'rim'
+   ? band(R0 + (NR - 1) * step + GAP, R1 - 0.7)
+   : band(0, R0 + (NR - 1) * step - GAP);
+  out += '<defs><filter id="frost" x="-12%" y="-12%" width="124%" height="124%">' +
+         '<feGaussianBlur stdDeviation="' + blur + '"/></filter>' +
+         '<clipPath id="pane"><path d="' + pane + '" clip-rule="evenodd"/></clipPath>' +
+         '</defs><g clip-path="url(#pane)"><g filter="url(#frost)">' + back.join('') + '</g>' +
+         '<path d="' + pane + '" fill-rule="evenodd" fill="var(--surface)" opacity="' +
+         wash + '"/></g>';
+ } else out += '<g>' + back.join('') + '</g>';
+ out += '<g id="clear">' + front.join('') + '</g>';
+
+ out += '<circle cx="' + CX + '" cy="' + CY + '" r="' + (R1 - 0.7) +
+        '" fill="none" stroke="var(--ink)" stroke-width="3.5"/>';
+ out += '<circle cx="' + CX + '" cy="' + CY + '" r="' + (R0 - 4) +
+        '" fill="var(--surface)" stroke="var(--rule)"/>';
+ out += '<circle id="hub" cx="' + CX + '" cy="' + CY + '" r="' + (R0 - 12) + '" fill="none"/>';
+ svg.innerHTML = out;
  return NR;
 }
 
@@ -402,7 +441,10 @@ function mark(svg, cells, i) {
   ps[j].classList.toggle('on', is);
   if (is) on = ps[j];
  }
- if (on) svg.insertBefore(on, svg.querySelector('circle'));
+ /* the pick always ends up in the clear group, last: under the rings, and never
+    behind the glass even when the ring it came from is the frosted one */
+ var clear = svg.querySelector('#clear');
+ if (on && clear) clear.appendChild(on);
  if (hub) hub.setAttribute('fill', cells && cells[i] ? rgb(cells[i].rgb) : 'none');
 }
 
@@ -420,7 +462,7 @@ return { draw: draw, mark: mark, ringCss: ringCss, rgb: rgb, grey: grey,
 </script>
 <script>
 /* The tube as the camera sees it, drawn for the pages that have no camera.
-   Both offline demos mount this, so the tube looks the same in each. */
+   Both demos mount this, so the tube looks the same in each. */
 window.Tube = (function () {
 var TOP = 242, FPS = 30;
 var WHITE = [170.742, 186.915, 181.804], FIELD = [172.212, 194.646, 192.399], WALL = [145, 159, 155];
@@ -557,7 +599,7 @@ function paint(el, frame) {
   if (f.mix && f.mix.length) {
    /* one thin stroke per slice of the bore, so the tongue and the wall sheath show */
    var dye=depth(f.old||BASE, f.neu||BASE), v=f.v||0;
-   /* the fluid coasting to a halt is the sim's business; once it is truly still
+   /* the fluid coasting to a halt is the caller's business; once it is truly still
       the lines relax away instead of freezing on screen */
    /* the coast decays exponentially, so v never settles exactly -- still means
       moving by less than a frame's worth of flow, not byte-identical */
@@ -861,11 +903,11 @@ window.fetch=async function(url,opts){
  }catch(e){ return reply({error:e.name+': '+e.message},500); }
 };
 
-/* The page reads its state off a socket, so the simulator answers one -- the
+/* The page reads its state off a socket, so this answers one -- the
    same move as the fetch override above, and for the same reason: the page keeps
    a single code path whether or not a rig is behind it. The rig pushes when
    something changes and coalesces at PUSH_S; here a PUSH_S timer is the same
-   thing seen from the page, and idle traffic costs nothing offline. */
+   thing seen from the page, and idle traffic costs nothing here. */
 window.WebSocket=function(){
  var me=this, beat=0;
  me.readyState=1;
@@ -886,7 +928,7 @@ Tube.paint(document.getElementById('cam'), function(){
 });
 
 window.sim={trip:function(alert){ R.armed=alert||'SYS_OVERPRESSURE_TRIP' },state:state,colour:colour,conc:conc,rates:rates,lab:lab};
-console.info('mixer offline: ?speed=N runs the rig N times faster; sim.trip() trips the next push');
+console.info('?speed=N runs N times faster; sim.trip() trips the next push');
 })();
 </script>
 <script>
@@ -1027,7 +1069,7 @@ var rgb=Coast.rgb, hex=Coast.hex;
 
 function targetRGB(){
  var q=flows(parts(),strength());
- /* the simulator carries the fitted colour model, which is good anywhere */
+ /* when the page carries the fitted colour model, use it -- it is good anywhere */
  if(window.sim&&sim.colour&&sim.conc) return sim.colour(sim.conc({A:q[0],B:q[1],C:q[2],D:q[3]}));
  /* otherwise read it off the wheel's own measured colours: exact at a cell,
     smooth between the nearest few, and saturating rather than extrapolating */
@@ -1067,6 +1109,7 @@ function drawWheel(){
 }
 $('wheel').addEventListener('click',function(e){
  var p=e.target.closest('path.cell'); if(!p||!W) return;
+ if(p.classList.contains('off')) return;   /* locked: the glass says so */
  var i=+p.dataset.i, r=recipe(W.cells[i]); load(r.u,r.s,i);
 });
 

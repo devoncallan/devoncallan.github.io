@@ -120,13 +120,9 @@ def collect() -> list[dict]:
             "when": updated(path),
             "size": size_of(path),
         })
-    # site.json lists pages in the order they should appear; anything not
-    # listed there falls in after them, most recently changed first.
-    listed = list(over.keys())
-    items.sort(key=lambda i: (
-        listed.index(i["file"]) if i["file"] in listed else len(listed),
-        -i["when"].timestamp(),
-    ))
+    # newest first, by the same date the row shows: the file's last commit
+    # date, or its modification time while it is still uncommitted.
+    items.sort(key=lambda i: -i["when"].timestamp())
     return items
 
 
