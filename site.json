@@ -15,7 +15,11 @@
     },
     "color_mixer_demo.html": {
       "title": "Color mixer demo",
-      "description": "Interactive simulation of the color mixer. Pick a target color and it blends three dyes to match it."
+      "description": "Interactive COAST PCL color mixer. Dial a dye recipe or pick a colour off the wheel, and watch it mix, flow down the tube, and be measured."
+    },
+    "color_target_demo.html": {
+      "title": "Color target demo",
+      "description": "Interactive closed-loop colour targeting. Pick a colour on the wheel and watch the rig sample, measure and correct its way to a match."
     }
   }
 }
